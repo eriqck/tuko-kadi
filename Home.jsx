@@ -1,4 +1,5 @@
 import posterImage from "./assets/poster.jpg";
+import React, { useEffect, useRef, useState } from 'react';
 
 const BASE_URL = "https://tuko-kadi-pi.vercel.app";
 
@@ -62,6 +63,57 @@ Join me: ${BASE_URL}`;
     const whatsappLink = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(whatsappLink, "_blank", "noopener,noreferrer");
   };
+
+  // Animated stat component: counts up numeric parts and shows suffixes (e.g. "128K+")
+  function AnimatedStat({ value, label }) {
+    const [display, setDisplay] = useState('0');
+    const rafRef = useRef(null);
+
+    useEffect(() => {
+      // extract numeric start and suffix
+      const match = String(value).match(/^([0-9,.]+)\s*([A-Za-z+%]*)$/);
+      if (!match) {
+        // non-numeric -> show a pulsing label
+        setDisplay(value);
+        return;
+      }
+
+      let num = parseFloat(match[1].replace(/,/g, ''));
+      const suffix = match[2] || '';
+      const duration = 1200;
+      const start = performance.now();
+
+      const step = (time) => {
+        const t = Math.min(1, (time - start) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        const current = Math.round(num * eased);
+        setDisplay(`${current}${suffix}`);
+        if (t < 1) rafRef.current = requestAnimationFrame(step);
+      };
+
+      rafRef.current = requestAnimationFrame(step);
+      return () => cancelAnimationFrame(rafRef.current);
+    }, [value]);
+
+    // If display is non-numeric (e.g., "Growing"), add a subtle pulse
+    const isNonNumeric = isNaN(Number(String(display).replace(/[^0-9.-]+/g, '')));
+
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+        <div className="text-2xl font-black">
+          {isNonNumeric ? (
+            <span className="inline-flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+              {display}
+            </span>
+          ) : (
+            display
+          )}
+        </div>
+        <div className="mt-1 text-xs text-white/60">{label}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -159,15 +211,7 @@ Join me: ${BASE_URL}`;
 
               <div className="mt-12 grid grid-cols-2 gap-4 md:grid-cols-4">
                 {stats.map((stat) => (
-                  <div
-                    key={stat.label}
-                    className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur"
-                  >
-                    <div className="text-2xl font-black">{stat.value}</div>
-                    <div className="mt-1 text-xs text-white/60">
-                      {stat.label}
-                    </div>
-                  </div>
+                  <AnimatedStat key={stat.label} value={stat.value} label={stat.label} />
                 ))}
               </div>
             </div>
