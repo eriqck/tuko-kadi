@@ -1,8 +1,11 @@
-import { useNavigate } from "react-router-dom";
 import posterImage from "./assets/poster.jpg";
 
+const BASE_URL = "https://tuko-kadi-pi.vercel.app";
+
 export default function TukoKadiLanding() {
-  const navigate = useNavigate();
+  const goTo = (path) => {
+    window.location.href = `${BASE_URL}${path}`;
+  };
 
   const stats = [
     { label: "People already moving", value: "128K+" },
@@ -52,7 +55,10 @@ export default function TukoKadiLanding() {
   const shareOnWhatsApp = (message) => {
     const text =
       message ||
-      "I'm registering! Let's go together 🚀\n\nJoin me: https://yourlink.com";
+      `I'm registering! Let's go together 🚀
+
+Join me: ${BASE_URL}`;
+
     const whatsappLink = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(whatsappLink, "_blank", "noopener,noreferrer");
   };
@@ -83,14 +89,14 @@ export default function TukoKadiLanding() {
             </a>
             <button
               type="button"
-              onClick={() => navigate("/centres")}
+              onClick={() => goTo("/centres")}
               className="cursor-pointer hover:text-white"
             >
               Centres
             </button>
             <button
               type="button"
-              onClick={() => navigate("/groups")}
+              onClick={() => goTo("/groups")}
               className="cursor-pointer hover:text-white"
             >
               Groups
@@ -99,7 +105,7 @@ export default function TukoKadiLanding() {
 
           <button
             type="button"
-            onClick={() => navigate("/centres")}
+            onClick={() => goTo("/centres")}
             className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-900/30 transition hover:scale-[1.02] hover:bg-red-500"
           >
             Get Started
@@ -137,14 +143,14 @@ export default function TukoKadiLanding() {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:gap-4">
                 <button
                   type="button"
-                  onClick={() => navigate("/centres")}
+                  onClick={() => goTo("/centres")}
                   className="w-full rounded-full bg-red-600 px-7 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white shadow-xl shadow-red-900/25 transition hover:bg-red-500"
                 >
                   Find where to go
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate("/groups")}
+                  onClick={() => goTo("/groups")}
                   className="w-full rounded-full border border-white/20 bg-white/5 px-7 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/10"
                 >
                   Go with friends
@@ -248,7 +254,7 @@ export default function TukoKadiLanding() {
               </div>
               <button
                 type="button"
-                onClick={() => navigate("/centres")}
+                onClick={() => goTo("/centres")}
                 className="mt-6 w-full rounded-full bg-white px-6 py-3 text-sm font-bold text-black transition hover:bg-white/90"
               >
                 Explore All Centres →
@@ -293,7 +299,9 @@ export default function TukoKadiLanding() {
                       type="button"
                       onClick={() =>
                         shareOnWhatsApp(
-                          `Let's register together at ${center.name} in ${center.place} 🚀`
+                          `Let's register together at ${center.name} in ${center.place} 🚀
+
+Join here: ${BASE_URL}/centres`
                         )
                       }
                       className="flex-1 rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
@@ -342,7 +350,7 @@ export default function TukoKadiLanding() {
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     <button
                       type="button"
-                      onClick={() => navigate("/groups")}
+                      onClick={() => goTo("/groups")}
                       className="flex-1 rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500"
                     >
                       Join group
@@ -351,7 +359,9 @@ export default function TukoKadiLanding() {
                       type="button"
                       onClick={() =>
                         shareOnWhatsApp(
-                          `Join our group: ${group.name} - ${group.time} 🚀`
+                          `Join our group: ${group.name} - ${group.time} 🚀
+
+Join here: ${BASE_URL}/groups`
                         )
                       }
                       className="flex-1 rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
@@ -389,7 +399,7 @@ export default function TukoKadiLanding() {
 
               <button
                 type="button"
-                onClick={() => navigate("/groups")}
+                onClick={() => goTo("/groups")}
                 className="mt-6 w-full rounded-full bg-white px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-black transition hover:bg-white/90"
               >
                 Create your group
