@@ -1,11 +1,16 @@
 import posterImage from "./assets/poster.jpg";
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from "react";
 
 const BASE_URL = "https://tuko-kadi-pi.vercel.app";
 
 export default function TukoKadiLanding() {
   const goTo = (section) => {
-    window.location.href = `${BASE_URL}/#${section}`;
+    const el = document.getElementById(section);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      window.location.href = `${BASE_URL}/#${section}`;
+    }
   };
 
   const stats = [
@@ -55,31 +60,25 @@ export default function TukoKadiLanding() {
 
   const shareOnWhatsApp = (message) => {
     const text =
-      message ||
-      `I'm registering! Let's go together 🚀
-
-Join me: ${BASE_URL}`;
-
+      message || `I'm registering! Let's go together 🚀 Join me: ${BASE_URL}`;
     const whatsappLink = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(whatsappLink, "_blank", "noopener,noreferrer");
   };
 
-  // Animated stat component: counts up numeric parts and shows suffixes (e.g. "128K+")
   function AnimatedStat({ value, label }) {
-    const [display, setDisplay] = useState('0');
+    const [display, setDisplay] = useState("0");
     const rafRef = useRef(null);
 
     useEffect(() => {
-      // extract numeric start and suffix
       const match = String(value).match(/^([0-9,.]+)\s*([A-Za-z+%]*)$/);
+
       if (!match) {
-        // non-numeric -> show a pulsing label
         setDisplay(value);
         return;
       }
 
-      let num = parseFloat(match[1].replace(/,/g, ''));
-      const suffix = match[2] || '';
+      const num = parseFloat(match[1].replace(/,/g, ""));
+      const suffix = match[2] || "";
       const duration = 1200;
       const start = performance.now();
 
@@ -92,11 +91,14 @@ Join me: ${BASE_URL}`;
       };
 
       rafRef.current = requestAnimationFrame(step);
-      return () => cancelAnimationFrame(rafRef.current);
+
+      return () => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      };
     }, [value]);
 
-    // If display is non-numeric (e.g., "Growing"), add a subtle pulse
-    const isNonNumeric = isNaN(Number(String(display).replace(/[^0-9.-]+/g, '')));
+    const numericOnly = String(display).replace(/[^0-9.-]+/g, "");
+    const isNonNumeric = !numericOnly || isNaN(Number(numericOnly));
 
     return (
       <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
@@ -136,9 +138,13 @@ Join me: ${BASE_URL}`;
           </div>
 
           <div className="hidden items-center gap-8 text-sm text-white/70 md:flex">
-            <a href="#features" className="hover:text-white">
+            <button
+              type="button"
+              onClick={() => goTo("features")}
+              className="hover:text-white"
+            >
               What you can do
-            </a>
+            </button>
             <button
               type="button"
               onClick={() => goTo("centres")}
@@ -211,7 +217,11 @@ Join me: ${BASE_URL}`;
 
               <div className="mt-12 grid grid-cols-2 gap-4 md:grid-cols-4">
                 {stats.map((stat) => (
-                  <AnimatedStat key={stat.label} value={stat.value} label={stat.label} />
+                  <AnimatedStat
+                    key={stat.label}
+                    value={stat.value}
+                    label={stat.label}
+                  />
                 ))}
               </div>
             </div>
@@ -251,7 +261,7 @@ Join me: ${BASE_URL}`;
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="cursor-pointer rounded-[1.8rem] border border-red-600 bg-gray-800 text-white p-6 shadow-sm shadow-black/10 transition transform hover:-translate-y-1 hover:shadow-xl hover:border-red-500"
+                className="cursor-pointer rounded-[1.8rem] border border-red-600 bg-gray-800 p-6 text-white shadow-sm shadow-black/10 transition transform hover:-translate-y-1 hover:border-red-500 hover:shadow-xl"
               >
                 <h4 className="text-xl font-bold">{feature.title}</h4>
                 <p className="mt-3 text-sm leading-7 text-white/60">
@@ -288,6 +298,7 @@ Join me: ${BASE_URL}`;
                 No confusion. No long searching. Just clear options, distance,
                 and timing.
               </p>
+
               <div className="mt-8 rounded-3xl bg-black/15 p-4">
                 <p className="text-sm text-white/70">
                   Search by town, estate, campus, or county
@@ -296,6 +307,7 @@ Join me: ${BASE_URL}`;
                   Thika, Kiambu County
                 </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => goTo("centres")}
@@ -309,7 +321,7 @@ Join me: ${BASE_URL}`;
               {centers.map((center) => (
                 <div
                   key={center.name}
-                  className="rounded-[1.8rem] border border-red-600 bg-gray-800 text-white p-6 shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
+                  className="rounded-[1.8rem] border border-red-600 bg-gray-800 p-6 text-white shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -318,6 +330,7 @@ Join me: ${BASE_URL}`;
                         {center.place}
                       </p>
                     </div>
+
                     <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.18em] text-white/60">
                       <span className="rounded-full border border-white/10 px-3 py-2">
                         {center.time}
@@ -339,25 +352,34 @@ Join me: ${BASE_URL}`;
                     >
                       View directions
                     </a>
+
                     <button
                       type="button"
                       onClick={() =>
                         shareOnWhatsApp(
-                          `Let's register together at ${center.name} in ${center.place} 🚀
-
-Join here: ${BASE_URL}/#centres`
+                          `Let's register together at ${center.name} in ${center.place} 🚀 Join here: ${BASE_URL}/#centres`
                         )
                       }
                       className="flex-1 rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                     >
                       Share on WhatsApp
-                    <button
-                      type="button"
-                      onClick={() => goTo("groups")}
-                      className="mt-6 w-full rounded-full bg-white/10 px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-white transition hover:bg-white/20"
-                    >
-                      Create your group
                     </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={() => goTo("groups")}
+              className="w-full rounded-full bg-white/10 px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-white transition hover:bg-white/20"
+            >
+              Create your group
+            </button>
+          </div>
+        </section>
 
         <section
           id="groups"
@@ -377,7 +399,7 @@ Join here: ${BASE_URL}/#centres`
               {groups.map((group) => (
                 <div
                   key={group.name}
-                  className="rounded-[1.8rem] border border-red-600 bg-gray-800 text-white p-6 shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
+                  className="rounded-[1.8rem] border border-red-600 bg-gray-800 p-6 text-white shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -386,6 +408,7 @@ Join here: ${BASE_URL}/#centres`
                         {group.members}
                       </p>
                     </div>
+
                     <div className="rounded-full border border-white/10 px-4 py-2 text-xs uppercase tracking-[0.18em] text-white/60">
                       {group.time}
                     </div>
@@ -399,13 +422,12 @@ Join here: ${BASE_URL}/#centres`
                     >
                       Join group
                     </button>
+
                     <button
                       type="button"
                       onClick={() =>
                         shareOnWhatsApp(
-                          `Join our group: ${group.name} - ${group.time} 🚀
-
-Join here: ${BASE_URL}/#groups`
+                          `Join our group: ${group.name} - ${group.time} 🚀 Join here: ${BASE_URL}/#groups`
                         )
                       }
                       className="flex-1 rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
@@ -467,7 +489,7 @@ Join here: ${BASE_URL}/#groups`
               {steps.map((step, index) => (
                 <div
                   key={step}
-                  className="rounded-[1.8rem] border border-red-600 bg-gray-800 text-white p-6 shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
+                  className="rounded-[1.8rem] border border-red-600 bg-gray-800 p-6 text-white shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
                 >
                   <p className="text-sm text-white/40">Step {index + 1}</p>
                   <h4 className="mt-2 text-xl font-bold">{step}</h4>
