@@ -1,188 +1,362 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import posterImage from '../assets/poster.jpg'
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import SiteHeader from "../components/SiteHeader";
+import { useAppData } from "../context/AppDataContext";
+import {
+  buildAbsoluteUrl,
+  buildWhatsAppUrl,
+  formatDepartureTime,
+  formatGroupMembers,
+} from "../lib/app-utils";
+
+const EMPTY_FORM = {
+  name: "",
+  meetingPoint: "",
+  departureTime: "",
+  area: "",
+  centerId: "",
+};
 
 export default function Groups() {
-  const navigate = useNavigate()
-  const [groups, setGroups] = useState([
-    { id: 1, name: "Thika Mbogi", members: "18 joined", time: "Leaving Sunday 10:00 AM", meeting: "Thika stage" },
-    { id: 2, name: "Juja Campus Wave", members: "26 joined", time: "Leaving Saturday 9:00 AM", meeting: "Campus main gate" },
-    { id: 3, name: "Ruiru Youth Squad", members: "12 joined", time: "Leaving Sunday 8:30 AM", meeting: "Ruiru market" },
-  ])
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { areas, centres, createGroup, groups, joinGroup, leaveGroup } =
+    useAppData();
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [feedbackMessage, setFeedbackMessage] = useState("");
 
-  const [formData, setFormData] = useState({
-    name: '',
-    meeting: '',
-    time: '',
-  })
+  const highlightedGroupId = searchParams.get("group") || "";
+  const prefilledCentreId = searchParams.get("centre") || "";
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
+  const selectedCentre = useMemo(
+    () => centres.find((centre) => centre.id === formData.centerId) || null,
+    [centres, formData.centerId],
+  );
 
-  const handleCreateGroup = (e) => {
-    e.preventDefault()
-    if (formData.name && formData.meeting && formData.time) {
-      const newGroup = {
-        id: groups.length + 1,
-        name: formData.name,
-        members: "1 joined",
-        time: `Leaving ${formData.time}`,
-        meeting: formData.meeting
-      }
-      setGroups([...groups, newGroup])
-      setFormData({ name: '', meeting: '', time: '' })
-      alert('✅ Group created! Now share it with your friends.')
+  useEffect(() => {
+    if (!prefilledCentreId) {
+      return;
     }
-  }
 
-  const shareGroupOnWhatsApp = (groupName, meetingPoint) => {
-    const text = `Join my mbogi: "${groupName}" 🚀\n\nMeeting: ${meetingPoint}\n\nLet's register together! https://yourlink.com/groups`
-    const whatsappLink = `https://wa.me/?text=${encodeURIComponent(text)}`
-    window.open(whatsappLink, '_blank')
-  }
+    const centre = centres.find((entry) => entry.id === prefilledCentreId);
+
+    if (!centre) {
+      return;
+    }
+
+    setFormData((currentFormData) => ({
+      ...currentFormData,
+      centerId: centre.id,
+      area: currentFormData.area || centre.place,
+    }));
+  }, [centres, prefilledCentreId]);
+
+  useEffect(() => {
+    if (!feedbackMessage) {
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => setFeedbackMessage(""), 3500);
+    return () => window.clearTimeout(timerId);
+  }, [feedbackMessage]);
+
+  const openWhatsApp = (message) => {
+    window.open(
+      buildWhatsAppUrl(message),
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
+
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+
+    if (name === "centerId") {
+      const centre = centres.find((entry) => entry.id === value);
+
+      setFormData((currentFormData) => ({
+        ...currentFormData,
+        centerId: value,
+        area: centre ? centre.place : currentFormData.area,
+      }));
+      return;
+    }
+
+    setFormData((currentFormData) => ({
+      ...currentFormData,
+      [name]: value,
+    }));
+  };
+
+  const handleCreateGroup = (event) => {
+    event.preventDefault();
+
+    const cleanName = formData.name.trim();
+    const cleanMeetingPoint = formData.meetingPoint.trim();
+
+    if (!cleanName || !cleanMeetingPoint || !formData.departureTime) {
+      setFeedbackMessage("Add a name, meeting point, and departure time.");
+      return;
+    }
+
+    if (!formData.centerId) {
+      setFeedbackMessage("Choose the centre your group is going to.");
+      return;
+    }
+
+    const newGroup = createGroup({
+      name: cleanName,
+      area: formData.area,
+      meetingPoint: cleanMeetingPoint,
+      departureTime: formData.departureTime,
+      centerId: formData.centerId,
+    });
+
+    setFormData({
+      ...EMPTY_FORM,
+      area: formData.area,
+      centerId: formData.centerId,
+    });
+    setFeedbackMessage(`${newGroup.name} is live. Share it now.`);
+    navigate(`/groups?group=${newGroup.id}`, { replace: true });
+  };
+
+  const handleGroupAction = (group) => {
+    const actionWorked = group.isJoined
+      ? leaveGroup(group.id)
+      : joinGroup(group.id);
+
+    if (!actionWorked) {
+      return;
+    }
+
+    setFeedbackMessage(
+      group.isJoined
+        ? `You left ${group.name}.`
+        : `You joined ${group.name}.`,
+    );
+  };
+
+  const shareGroupOnWhatsApp = (group) => {
+    openWhatsApp(
+      `Join ${group.name}. Meet at ${group.meetingPoint}. ${formatDepartureTime(
+        group.departureTime,
+      )}. Group link: ${buildAbsoluteUrl(`/groups?group=${group.id}`)}`,
+    );
+  };
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-black/40 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
-          <button onClick={() => navigate('/')} className="flex items-center gap-3 cursor-pointer hover:opacity-80">
-            <img src={posterImage} alt="Tuko Kadi" className="h-14 w-14 rounded-xl object-cover" />
-            <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-white/45">Register Na Mbogi</p>
-              <h1 className="text-lg font-black uppercase tracking-wide">Tuko Kadi</h1>
-            </div>
-          </button>
-
-          <div className="hidden items-center gap-8 text-sm text-white/70 md:flex">
-            <a href="/#features" className="hover:text-white">What you can do</a>
-            <button onClick={() => navigate('/centres')} className="hover:text-white">Centres</button>
-            <button onClick={() => navigate('/groups')} className="hover:text-white">Groups</button>
-          </div>
-
-          <button onClick={() => navigate('/centres')} className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-900/30 transition hover:scale-[1.02] hover:bg-red-500">
-            Find Centre
-          </button>
-        </div>
-      </header>
+      <SiteHeader primaryAction={{ label: "Find Centre", to: "/centres" }} />
 
       <main className="mx-auto max-w-7xl px-6 py-8 lg:px-8 lg:py-12">
         <div className="mb-12">
-          <h2 className="text-4xl font-black uppercase text-red-600 mb-2">Join or Create a Mbogi</h2>
-          <p className="text-white/70">Move with your people. Create a group for your estate, church, school, campus, or friend circle.</p>
+          <h2 className="mb-2 text-4xl font-black uppercase text-red-600">
+            Join or Create a Mbogi
+          </h2>
+          <p className="text-white/70">
+            Pick an active group, or create your own trip and send the invite
+            link to everyone you want on the same plan.
+          </p>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          {/* Existing Groups */}
-          <div>
-            <h3 className="text-xl font-bold mb-6">Available Groups</h3>
-            <div className="grid gap-4">
-              {groups.map((group) => (
-                <div
-                  key={group.id}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 hover:border-red-500/30 transition"
-                >
-                  <div className="flex flex-col gap-4">
-                    <div>
-                      <h4 className="text-lg font-bold">{group.name}</h4>
-                      <p className="mt-1 text-sm text-white/60">{group.members}</p>
-                      <p className="mt-2 text-xs text-white/50">📍 {group.meeting}</p>
-                      <p className="mt-1 text-xs text-white/50">⏰ {group.time}</p>
-                    </div>
+        {feedbackMessage ? (
+          <div className="mb-8 rounded-2xl border border-green-500/30 bg-green-500/10 px-5 py-4 text-sm text-green-100">
+            {feedbackMessage}
+          </div>
+        ) : null}
 
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <button
-                        onClick={() => shareGroupOnWhatsApp(group.name, group.meeting)}
-                        className="flex-1 rounded-full bg-green-600 px-4 py-3 text-sm font-semibold text-white hover:bg-green-500 transition"
-                      >
-                        📱 Join & Share
-                      </button>
-                      <button
-                        onClick={() => shareGroupOnWhatsApp(group.name, group.meeting)}
-                        className="flex-1 rounded-full border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white hover:border-white/40 transition"
-                      >
-                        Share Invite
-                      </button>
+        <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+          <div>
+            <h3 className="mb-6 text-xl font-bold">Available Groups</h3>
+            <div className="grid gap-4">
+              {groups.map((group) => {
+                const isHighlighted = group.id === highlightedGroupId;
+
+                return (
+                  <div
+                    key={group.id}
+                    className={`rounded-2xl border bg-white/[0.03] p-6 transition ${
+                      isHighlighted
+                        ? "border-red-500 shadow-lg shadow-red-900/20"
+                        : "border-white/10 hover:border-red-500/30"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <h4 className="text-lg font-bold">{group.name}</h4>
+                          <p className="mt-1 text-sm text-white/60">
+                            {formatGroupMembers(group.memberCount)}
+                          </p>
+                          <p className="mt-2 text-sm text-white/50">
+                            Meet at {group.meetingPoint}
+                          </p>
+                          {group.centre ? (
+                            <p className="mt-1 text-sm text-white/50">
+                              Heading to {group.centre.name}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="rounded-full border border-white/10 px-4 py-2 text-xs uppercase tracking-[0.18em] text-white/60">
+                          {formatDepartureTime(group.departureTime)}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={() => handleGroupAction(group)}
+                          className="flex-1 rounded-full bg-green-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-500"
+                        >
+                          {group.isJoined ? "Leave group" : "Join group"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => shareGroupOnWhatsApp(group)}
+                          className="flex-1 rounded-full border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:border-white/40"
+                        >
+                          Share invite
+                        </button>
+                        {group.centre ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigate(`/centres?centre=${group.centre.id}`)
+                            }
+                            className="flex-1 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-500/20"
+                          >
+                            View centre
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
-          {/* Create Group Form */}
           <div>
-            <h3 className="text-xl font-bold mb-6">Start Your Own</h3>
-            <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-8 sticky top-24">
+            <h3 className="mb-6 text-xl font-bold">Start Your Own</h3>
+            <div className="sticky top-24 rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.07] to-white/[0.02] p-8">
               <form onSubmit={handleCreateGroup} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-semibold text-white/70 mb-2">Group Name</label>
+                  <label className="mb-2 block text-sm font-semibold text-white/70">
+                    Group Name
+                  </label>
                   <input
                     type="text"
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    placeholder="e.g., Thika Sunday Mbogi"
-                    className="w-full rounded-lg bg-black/25 border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-red-500/50 text-sm"
+                    placeholder="Thika Sunday Mbogi"
+                    className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-red-500/50"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white/70 mb-2">Meeting Point</label>
+                  <label className="mb-2 block text-sm font-semibold text-white/70">
+                    Meeting Point
+                  </label>
                   <input
                     type="text"
-                    name="meeting"
-                    value={formData.meeting}
+                    name="meetingPoint"
+                    value={formData.meetingPoint}
                     onChange={handleInputChange}
-                    placeholder="e.g., Thika stage"
-                    className="w-full rounded-lg bg-black/25 border border-white/10 px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-red-500/50 text-sm"
+                    placeholder="Thika stage"
+                    className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-red-500/50"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-white/70 mb-2">Departure Time</label>
+                  <label className="mb-2 block text-sm font-semibold text-white/70">
+                    Departure Time
+                  </label>
                   <input
                     type="datetime-local"
-                    name="time"
-                    value={formData.time}
+                    name="departureTime"
+                    value={formData.departureTime}
                     onChange={handleInputChange}
-                    className="w-full rounded-lg bg-black/25 border border-white/10 px-4 py-3 text-white focus:outline-none focus:border-red-500/50 text-sm"
+                    className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500/50"
                     required
                   />
                 </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-white/70">
+                    Area
+                  </label>
+                  <select
+                    name="area"
+                    value={formData.area}
+                    onChange={handleInputChange}
+                    className="w-full rounded-lg border border-white/10 bg-black px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500/50"
+                  >
+                    <option value="">Choose area</option>
+                    {areas.map((area) => (
+                      <option key={area} value={area}>
+                        {area}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-white/70">
+                    Destination Centre
+                  </label>
+                  <select
+                    name="centerId"
+                    value={formData.centerId}
+                    onChange={handleInputChange}
+                    className="w-full rounded-lg border border-white/10 bg-black px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500/50"
+                    required
+                  >
+                    <option value="">Choose centre</option>
+                    {centres.map((centre) => (
+                      <option key={centre.id} value={centre.id}>
+                        {centre.name} - {centre.place}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {selectedCentre ? (
+                  <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4 text-sm text-white/80">
+                    {selectedCentre.name} in {selectedCentre.place}.{" "}
+                    {selectedCentre.status}.
+                  </div>
+                ) : null}
 
                 <button
                   type="submit"
-                  className="w-full rounded-lg bg-red-600 px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-white hover:bg-red-500 transition mt-6"
+                  className="mt-6 w-full rounded-lg bg-red-600 px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-white transition hover:bg-red-500"
                 >
                   Create Group
                 </button>
               </form>
 
-              <p className="mt-6 text-xs text-white/50 text-center">
-                Your group will be shared and visible to all users
+              <p className="mt-6 text-center text-xs text-white/50">
+                Your new group is saved here and ready to share immediately.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Back Button */}
         <div className="mt-12">
           <button
-            onClick={() => navigate('/')}
-            className="w-full sm:w-auto rounded-full border border-white/20 bg-white/5 px-8 py-4 text-sm font-semibold text-white hover:border-white/40 transition"
+            type="button"
+            onClick={() => navigate("/")}
+            className="w-full rounded-full border border-white/20 bg-white/5 px-8 py-4 text-sm font-semibold text-white transition hover:border-white/40 sm:w-auto"
           >
-            ← Back to Home
+            Back to Home
           </button>
         </div>
       </main>
     </div>
-  )
+  );
 }

@@ -1,175 +1,203 @@
-import posterImage from "./assets/poster.jpg";
 import React, { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import posterImage from "./assets/poster.jpg";
+import SiteHeader from "./components/SiteHeader";
+import { useAppData } from "./context/AppDataContext";
+import { REGISTRATION_CHECKLIST } from "./lib/content";
+import {
+  buildAbsoluteUrl,
+  buildWhatsAppUrl,
+  formatDepartureTime,
+  formatDistanceKm,
+  formatGroupMembers,
+  getDirectionsUrl,
+} from "./lib/app-utils";
 
-const BASE_URL = "https://tuko-kadi-pi.vercel.app";
+const STEPS = [
+  "Choose your town or use your live location",
+  "Pick the nearest centre with open hours",
+  "Join a mbogi or create your own trip",
+  "Register and share the link with more people",
+];
+
+function AnimatedStat({ value, label }) {
+  const [display, setDisplay] = useState("0");
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    const match = String(value).match(/^([0-9,.]+)\s*([A-Za-z+%]*)$/);
+
+    if (!match) {
+      setDisplay(value);
+      return;
+    }
+
+    const numberValue = parseFloat(match[1].replace(/,/g, ""));
+    const suffix = match[2] || "";
+    const duration = 1200;
+    const start = performance.now();
+
+    const step = (time) => {
+      const progress = Math.min(1, (time - start) / duration);
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      const currentValue = Math.round(numberValue * easedProgress);
+      setDisplay(`${currentValue}${suffix}`);
+
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(step);
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, [value]);
+
+  return (
+    <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+      <div className="text-2xl font-black">{display}</div>
+      <div className="mt-1 text-xs text-white/60">{label}</div>
+    </div>
+  );
+}
 
 export default function TukoKadiLanding() {
-  const goTo = (section) => {
-    const el = document.getElementById(section);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else {
-      window.location.href = `${BASE_URL}/#${section}`;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    centres,
+    groups,
+    joinGroup,
+    leaveGroup,
+    locationError,
+    locationStatus,
+    requestLocation,
+    stats,
+    userCoords,
+  } = useAppData();
+  const [centreQuery, setCentreQuery] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+
+  const previewCentres = centres.slice(0, 3);
+  const previewGroups = groups.slice(0, 3);
+
+  useEffect(() => {
+    if (!location.hash) {
+      return;
     }
+
+    const sectionId = location.hash.replace("#", "");
+    const timerId = window.setTimeout(() => {
+      document
+        .getElementById(sectionId)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+
+    return () => window.clearTimeout(timerId);
+  }, [location.hash]);
+
+  useEffect(() => {
+    if (!feedbackMessage) {
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => setFeedbackMessage(""), 3000);
+    return () => window.clearTimeout(timerId);
+  }, [feedbackMessage]);
+
+  const goTo = (sectionId) => {
+    document
+      .getElementById(sectionId)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const stats = [
-    { label: "People already moving", value: "128K+" },
-    { label: "Counties active", value: "34" },
-    { label: "Groups formed", value: "210" },
-    { label: "Daily momentum", value: "Growing" },
-  ];
+  const openWhatsApp = (message) => {
+    window.open(
+      buildWhatsAppUrl(message),
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
 
-  const features = [
+  const handleShareMovement = () => {
+    openWhatsApp(
+      `I am registering with Tuko Kadi. Join me here: ${buildAbsoluteUrl("/")}`,
+    );
+  };
+
+  const handleFindCentres = (event) => {
+    event.preventDefault();
+
+    const trimmedQuery = centreQuery.trim();
+    const search = trimmedQuery
+      ? `?q=${encodeURIComponent(trimmedQuery)}`
+      : "";
+
+    navigate(`/centres${search}`);
+  };
+
+  const handleShareCentre = (centre) => {
+    openWhatsApp(
+      `Let us register at ${centre.name} in ${centre.place}. Get directions here: ${buildAbsoluteUrl(
+        `/centres?centre=${centre.id}`,
+      )}`,
+    );
+  };
+
+  const handleShareGroup = (group) => {
+    openWhatsApp(
+      `Join ${group.name}. Meet at ${group.meetingPoint}. ${formatDepartureTime(
+        group.departureTime,
+      )}. Group link: ${buildAbsoluteUrl(`/groups?group=${group.id}`)}`,
+    );
+  };
+
+  const handleGroupAction = (group) => {
+    const actionWorked = group.isJoined
+      ? leaveGroup(group.id)
+      : joinGroup(group.id);
+
+    if (!actionWorked) {
+      return;
+    }
+
+    setFeedbackMessage(
+      group.isJoined
+        ? `You left ${group.name}.`
+        : `You joined ${group.name}.`,
+    );
+  };
+
+  const featureCards = [
     {
       title: "Find where to register",
-      text: "Quickly see the nearest place you can go today and what you need before you leave.",
+      text: "Use search or your current location to sort centres by what is closest right now.",
+      onClick: () => navigate("/centres"),
     },
     {
       title: "Go with your people",
-      text: "Create a group, invite friends, and move together instead of figuring it out alone.",
+      text: "Join an active mbogi or create one and keep the trip together in one place.",
+      onClick: () => navigate("/groups"),
     },
     {
-      title: "See who's showing up",
-      text: "Feel the movement around you through counties, campuses, and active groups.",
+      title: "See who is showing up",
+      text: "Live counts update from the groups people are actually joining in this browser.",
+      onClick: () => goTo("groups"),
     },
     {
       title: "Know what to carry",
-      text: "Get simple guidance so your trip is clear and stress-free.",
+      text: "Check the essentials before you leave so the trip stays smooth from start to finish.",
+      onClick: () => goTo("requirements"),
     },
   ];
 
-  const steps = [
-    "Choose your area",
-    "Find a nearby registration spot",
-    "Go with friends",
-    "Register and share",
-  ];
-
-  const centers = [
-    { name: "Thika Stadium Grounds", place: "Thika", time: "Open today", distance: "1.8 km" },
-    { name: "Juja Town Hall", place: "Juja", time: "Opens 8:00 AM", distance: "3.1 km" },
-    { name: "Ruiru Social Hall", place: "Ruiru", time: "Open today", distance: "5.4 km" },
-  ];
-
-  const groups = [
-    { name: "Thika Mbogi", members: "18 joined", time: "Leaving Sunday 10:00 AM" },
-    { name: "Juja Campus Wave", members: "26 joined", time: "Leaving Saturday 9:00 AM" },
-    { name: "Ruiru Youth Squad", members: "12 joined", time: "Leaving Sunday 8:30 AM" },
-  ];
-
-  const shareOnWhatsApp = (message) => {
-    const text =
-      message || `I'm registering! Let's go together 🚀 Join me: ${BASE_URL}`;
-    const whatsappLink = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(whatsappLink, "_blank", "noopener,noreferrer");
-  };
-
-  function AnimatedStat({ value, label }) {
-    const [display, setDisplay] = useState("0");
-    const rafRef = useRef(null);
-
-    useEffect(() => {
-      const match = String(value).match(/^([0-9,.]+)\s*([A-Za-z+%]*)$/);
-
-      if (!match) {
-        setDisplay(value);
-        return;
-      }
-
-      const num = parseFloat(match[1].replace(/,/g, ""));
-      const suffix = match[2] || "";
-      const duration = 1200;
-      const start = performance.now();
-
-      const step = (time) => {
-        const t = Math.min(1, (time - start) / duration);
-        const eased = 1 - Math.pow(1 - t, 3);
-        const current = Math.round(num * eased);
-        setDisplay(`${current}${suffix}`);
-        if (t < 1) rafRef.current = requestAnimationFrame(step);
-      };
-
-      rafRef.current = requestAnimationFrame(step);
-
-      return () => {
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      };
-    }, [value]);
-
-    const numericOnly = String(display).replace(/[^0-9.-]+/g, "");
-    const isNonNumeric = !numericOnly || isNaN(Number(numericOnly));
-
-    return (
-      <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur">
-        <div className="text-2xl font-black">
-          {isNonNumeric ? (
-            <span className="inline-flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
-              {display}
-            </span>
-          ) : (
-            display
-          )}
-        </div>
-        <div className="mt-1 text-xs text-white/60">{label}</div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-black text-white">
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-black/40 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
-          <div className="flex items-center gap-3">
-            <img
-              src={posterImage}
-              alt="Tuko Kadi"
-              className="h-14 w-14 rounded-xl object-cover"
-            />
-            <div>
-              <p className="text-xs uppercase tracking-[0.28em] text-white/45">
-                Register Na Mbogi
-              </p>
-              <h1 className="text-lg font-black uppercase tracking-wide">
-                Tuko Kadi
-              </h1>
-            </div>
-          </div>
-
-          <div className="hidden items-center gap-8 text-sm text-white/70 md:flex">
-            <button
-              type="button"
-              onClick={() => goTo("features")}
-              className="hover:text-white"
-            >
-              What you can do
-            </button>
-            <button
-              type="button"
-              onClick={() => goTo("centres")}
-              className="cursor-pointer hover:text-white"
-            >
-              Centres
-            </button>
-            <button
-              type="button"
-              onClick={() => goTo("groups")}
-              className="cursor-pointer hover:text-white"
-            >
-              Groups
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => goTo("centres")}
-            className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-900/30 transition hover:scale-[1.02] hover:bg-red-500"
-          >
-            Get Started
-          </button>
-        </div>
-      </header>
+      <SiteHeader primaryAction={{ label: "Get Started", section: "centres" }} />
 
       <main>
         <section className="relative isolate overflow-hidden">
@@ -190,12 +218,12 @@ export default function TukoKadiLanding() {
 
               <h2 className="mt-6 text-5xl font-black uppercase leading-[0.92] md:text-7xl">
                 Niko kadi je wewe?
-                <span className="block text-red-600">Jiandikishe Leo</span>
+                <span className="block text-red-600">Jiandikishe leo</span>
               </h2>
 
               <p className="mt-6 max-w-2xl text-base leading-7 text-white/80 md:text-lg">
-                Don't get left out. Find where to go, move with your people, and
-                make the whole thing feel easy, social, and real.
+                Find the nearest centre, join a group, and move with people who
+                are already planning the trip.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:gap-4">
@@ -252,29 +280,31 @@ export default function TukoKadiLanding() {
               </h3>
             </div>
             <p className="max-w-xl text-white/60">
-              The site should feel less like a government process and more like
-              a movement that helps you act fast.
+              Move fast with clear next steps, nearby centres, and people
+              already planning the trip.
             </p>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            {features.map((feature) => (
-              <div
+            {featureCards.map((feature) => (
+              <button
                 key={feature.title}
-                className="cursor-pointer rounded-[1.8rem] border border-red-600 bg-gray-800 p-6 text-white shadow-sm shadow-black/10 transition transform hover:-translate-y-1 hover:border-red-500 hover:shadow-xl"
+                type="button"
+                onClick={feature.onClick}
+                className="rounded-[1.8rem] border border-red-600 bg-gray-800 p-6 text-left text-white shadow-sm shadow-black/10 transition hover:-translate-y-1 hover:border-red-500 hover:shadow-xl"
               >
                 <h4 className="text-xl font-bold">{feature.title}</h4>
                 <p className="mt-3 text-sm leading-7 text-white/60">
                   {feature.text}
                 </p>
-              </div>
+              </button>
             ))}
           </div>
 
           <div className="mt-8 text-center">
             <button
               type="button"
-              onClick={() => shareOnWhatsApp()}
+              onClick={handleShareMovement}
               className="inline-flex items-center gap-2 rounded-full bg-green-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-500"
             >
               Share on WhatsApp
@@ -295,57 +325,85 @@ export default function TukoKadiLanding() {
                 Find a place you can actually go today
               </h3>
               <p className="mt-4 text-white/85">
-                No confusion. No long searching. Just clear options, distance,
-                and timing.
+                Search by town, or let your phone sort centres by distance.
               </p>
 
-              <div className="mt-8 rounded-3xl bg-black/15 p-4">
-                <p className="text-sm text-white/70">
+              <form onSubmit={handleFindCentres} className="mt-8">
+                <label
+                  htmlFor="home-centre-search"
+                  className="text-sm text-white/70"
+                >
                   Search by town, estate, campus, or county
-                </p>
-                <div className="mt-3 rounded-full bg-white/10 px-4 py-3 text-sm font-medium text-white">
-                  Thika, Kiambu County
-                </div>
-              </div>
+                </label>
+                <input
+                  id="home-centre-search"
+                  type="search"
+                  value={centreQuery}
+                  onChange={(event) => setCentreQuery(event.target.value)}
+                  placeholder="Thika, Juja, Ruiru..."
+                  className="mt-3 w-full rounded-full bg-white/10 px-4 py-3 text-sm font-medium text-white placeholder:text-white/55 focus:outline-none focus:ring-2 focus:ring-white/30"
+                />
 
-              <button
-                type="button"
-                onClick={() => goTo("centres")}
-                className="mt-6 w-full rounded-full bg-white/10 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/20"
-              >
-                Explore All Centres →
-              </button>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="submit"
+                    className="w-full rounded-full bg-white/10 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/20"
+                  >
+                    Explore all centres
+                  </button>
+                  <button
+                    type="button"
+                    onClick={requestLocation}
+                    className="w-full rounded-full border border-white/20 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
+                  >
+                    {locationStatus === "loading"
+                      ? "Locating..."
+                      : "Use my location"}
+                  </button>
+                </div>
+              </form>
+
+              <p className="mt-4 text-sm text-white/80">
+                {locationStatus === "ready"
+                  ? "Centres below are now sorted by your current location."
+                  : "Search any town now, then refine with your live location."}
+              </p>
+
+              {locationError ? (
+                <p className="mt-3 text-sm text-white">{locationError}</p>
+              ) : null}
             </div>
 
             <div className="grid gap-4">
-              {centers.map((center) => (
+              {previewCentres.map((centre) => (
                 <div
-                  key={center.name}
+                  key={centre.id}
                   className="rounded-[1.8rem] border border-red-600 bg-gray-800 p-6 text-white shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
-                      <h4 className="text-xl font-bold">{center.name}</h4>
+                      <h4 className="text-xl font-bold">{centre.name}</h4>
                       <p className="mt-1 text-sm text-white/55">
-                        {center.place}
+                        {centre.place}, {centre.county}
+                      </p>
+                      <p className="mt-2 text-xs text-white/45">
+                        {centre.landmark}
                       </p>
                     </div>
 
                     <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.18em] text-white/60">
                       <span className="rounded-full border border-white/10 px-3 py-2">
-                        {center.time}
+                        {centre.status}
                       </span>
                       <span className="rounded-full border border-red-500/30 bg-red-500/10 px-3 py-2 text-red-400">
-                        {center.distance}
+                        {formatDistanceKm(centre.distanceKm)}
                       </span>
                     </div>
                   </div>
 
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     <a
-                      href={`https://www.google.com/maps/search/${encodeURIComponent(
-                        center.name
-                      )}`}
+                      href={getDirectionsUrl(centre, userCoords)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 rounded-full bg-white/10 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/20"
@@ -355,11 +413,7 @@ export default function TukoKadiLanding() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        shareOnWhatsApp(
-                          `Let's register together at ${center.name} in ${center.place} 🚀 Join here: ${BASE_URL}/#centres`
-                        )
-                      }
+                      onClick={() => handleShareCentre(centre)}
                       className="flex-1 rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                     >
                       Share on WhatsApp
@@ -373,7 +427,7 @@ export default function TukoKadiLanding() {
           <div className="mt-6">
             <button
               type="button"
-              onClick={() => goTo("groups")}
+              onClick={() => navigate("/groups")}
               className="w-full rounded-full bg-white/10 px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-white transition hover:bg-white/20"
             >
               Create your group
@@ -394,42 +448,52 @@ export default function TukoKadiLanding() {
             </h3>
           </div>
 
+          {feedbackMessage ? (
+            <div className="mb-6 rounded-2xl border border-green-500/30 bg-green-500/10 px-5 py-4 text-sm text-green-100">
+              {feedbackMessage}
+            </div>
+          ) : null}
+
           <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="grid gap-4">
-              {groups.map((group) => (
+              {previewGroups.map((group) => (
                 <div
-                  key={group.name}
+                  key={group.id}
                   className="rounded-[1.8rem] border border-red-600 bg-gray-800 p-6 text-white shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
                       <h4 className="text-xl font-bold">{group.name}</h4>
                       <p className="mt-2 text-sm text-white/60">
-                        {group.members}
+                        {formatGroupMembers(group.memberCount)}
                       </p>
+                      <p className="mt-2 text-sm text-white/45">
+                        Meet at {group.meetingPoint}
+                      </p>
+                      {group.centre ? (
+                        <p className="mt-1 text-sm text-white/45">
+                          Heading to {group.centre.name}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="rounded-full border border-white/10 px-4 py-2 text-xs uppercase tracking-[0.18em] text-white/60">
-                      {group.time}
+                      {formatDepartureTime(group.departureTime)}
                     </div>
                   </div>
 
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     <button
                       type="button"
-                      onClick={() => goTo("groups")}
+                      onClick={() => handleGroupAction(group)}
                       className="flex-1 rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-500"
                     >
-                      Join group
+                      {group.isJoined ? "Leave group" : "Join group"}
                     </button>
 
                     <button
                       type="button"
-                      onClick={() =>
-                        shareOnWhatsApp(
-                          `Join our group: ${group.name} - ${group.time} 🚀 Join here: ${BASE_URL}/#groups`
-                        )
-                      }
+                      onClick={() => handleShareGroup(group)}
                       className="flex-1 rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                     >
                       Share invite
@@ -448,24 +512,24 @@ export default function TukoKadiLanding() {
               </h3>
               <p className="mt-4 text-white/65">
                 Create a group for your estate, church, school, campus, or
-                friend circle and turn the trip into a shared plan.
+                friend circle and take everyone to the same centre together.
               </p>
 
               <div className="mt-8 space-y-3">
                 <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/70">
-                  Group name: Thika Sunday Mbogi
+                  Pick a centre
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/70">
-                  Meeting point: Thika stage
+                  Add your meeting point
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/70">
-                  Time: 10:00 AM
+                  Share the invite link on WhatsApp
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={() => goTo("groups")}
+                onClick={() => navigate("/groups")}
                 className="mt-6 w-full rounded-full bg-white px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-black transition hover:bg-white/90"
               >
                 Create your group
@@ -474,7 +538,32 @@ export default function TukoKadiLanding() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-16 lg:px-8 lg:pb-24">
+        <section
+          id="requirements"
+          className="mx-auto max-w-7xl px-6 pb-8 lg:px-8"
+        >
+          <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-8">
+            <p className="text-sm uppercase tracking-[0.28em] text-white/45">
+              Know what to carry
+            </p>
+            <h3 className="mt-3 text-3xl font-black uppercase md:text-4xl">
+              Leave home ready
+            </h3>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              {REGISTRATION_CHECKLIST.map((item) => (
+                <div
+                  key={item}
+                  className="rounded-[1.8rem] border border-red-600 bg-gray-800 p-6 text-white shadow-sm shadow-black/10"
+                >
+                  <p className="text-lg font-semibold">{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-6 pb-16 pt-8 lg:px-8 lg:pb-24">
           <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
             <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-8">
               <p className="text-sm uppercase tracking-[0.28em] text-white/45">
@@ -486,7 +575,7 @@ export default function TukoKadiLanding() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              {steps.map((step, index) => (
+              {STEPS.map((step, index) => (
                 <div
                   key={step}
                   className="rounded-[1.8rem] border border-red-600 bg-gray-800 p-6 text-white shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
