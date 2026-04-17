@@ -251,7 +251,7 @@ Join me: ${BASE_URL}`;
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="cursor-pointer rounded-[1.8rem] border border-red-600 bg-white text-black p-6 shadow-sm shadow-black/10 transition transform hover:-translate-y-1 hover:shadow-xl hover:border-red-500"
+                className="cursor-pointer rounded-[1.8rem] border border-red-600 bg-gray-800 text-white p-6 shadow-sm shadow-black/10 transition transform hover:-translate-y-1 hover:shadow-xl hover:border-red-500"
               >
                 <h4 className="text-xl font-bold">{feature.title}</h4>
                 <p className="mt-3 text-sm leading-7 text-white/60">
@@ -309,7 +309,7 @@ Join me: ${BASE_URL}`;
               {centers.map((center) => (
                 <div
                   key={center.name}
-                  className="rounded-[1.8rem] border border-red-600 bg-white text-black p-6 shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
+                  className="rounded-[1.8rem] border border-red-600 bg-gray-800 text-white p-6 shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -377,7 +377,7 @@ Join here: ${BASE_URL}/#centres`
               {groups.map((group) => (
                 <div
                   key={group.name}
-                  className="rounded-[1.8rem] border border-red-600 bg-white text-black p-6 shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
+                  className="rounded-[1.8rem] border border-red-600 bg-gray-800 text-white p-6 shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -467,7 +467,7 @@ Join here: ${BASE_URL}/#groups`
               {steps.map((step, index) => (
                 <div
                   key={step}
-                  className="rounded-[1.8rem] border border-red-600 bg-white text-black p-6 shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
+                  className="rounded-[1.8rem] border border-red-600 bg-gray-800 text-white p-6 shadow-sm shadow-black/10 transition-shadow hover:shadow-lg"
                 >
                   <p className="text-sm text-white/40">Step {index + 1}</p>
                   <h4 className="mt-2 text-xl font-bold">{step}</h4>
