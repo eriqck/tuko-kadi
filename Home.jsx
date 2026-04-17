@@ -292,14 +292,14 @@ Join me: ${BASE_URL}`;
                 <p className="text-sm text-white/70">
                   Search by town, estate, campus, or county
                 </p>
-                <div className="mt-3 rounded-full bg-white px-4 py-3 text-sm font-medium text-black">
+                <div className="mt-3 rounded-full bg-white/10 px-4 py-3 text-sm font-medium text-white">
                   Thika, Kiambu County
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => goTo("centres")}
-                className="mt-6 w-full rounded-full bg-white px-6 py-3 text-sm font-bold text-black transition hover:bg-white/90"
+                className="mt-6 w-full rounded-full bg-white/10 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/20"
               >
                 Explore All Centres →
               </button>
@@ -335,7 +335,7 @@ Join me: ${BASE_URL}`;
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 rounded-full bg-white px-5 py-3 text-center text-sm font-semibold text-black transition hover:bg-white/90"
+                      className="flex-1 rounded-full bg-white/10 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/20"
                     >
                       View directions
                     </a>
@@ -351,13 +351,13 @@ Join here: ${BASE_URL}/#centres`
                       className="flex-1 rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                     >
                       Share on WhatsApp
+                    <button
+                      type="button"
+                      onClick={() => goTo("groups")}
+                      className="mt-6 w-full rounded-full bg-white/10 px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-white transition hover:bg-white/20"
+                    >
+                      Create your group
                     </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
 
         <section
           id="groups"
