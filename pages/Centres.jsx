@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import SiteHeader from "../components/SiteHeader";
 import { useAppData } from "../context/AppDataContext";
+import { CLOSED_REGISTRATION_AREAS } from "../lib/content";
 import {
   buildAbsoluteUrl,
   buildWhatsAppUrl,
@@ -13,26 +14,25 @@ export default function Centres() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const {
-    areas,
     centres,
+    counties,
     locationError,
     locationStatus,
     requestLocation,
     userCoords,
   } = useAppData();
   const [searchTerm, setSearchTerm] = useState(searchParams.get("q") || "");
-  const [selectedArea, setSelectedArea] = useState(
-    searchParams.get("area") || "all",
+  const [selectedCounty, setSelectedCounty] = useState(
+    searchParams.get("county") || "all",
   );
   const querySearchTerm = searchParams.get("q") || "";
-  const queryArea = searchParams.get("area") || "all";
-
+  const queryCounty = searchParams.get("county") || "all";
   const highlightedCentreId = searchParams.get("centre") || "";
 
   useEffect(() => {
     setSearchTerm(querySearchTerm);
-    setSelectedArea(queryArea);
-  }, [queryArea, querySearchTerm]);
+    setSelectedCounty(queryCounty);
+  }, [queryCounty, querySearchTerm]);
 
   const filteredCentres = useMemo(() => {
     const normalisedSearch = searchTerm.trim().toLowerCase();
@@ -43,14 +43,16 @@ export default function Centres() {
         centre.name.toLowerCase().includes(normalisedSearch) ||
         centre.place.toLowerCase().includes(normalisedSearch) ||
         centre.county.toLowerCase().includes(normalisedSearch) ||
-        centre.landmark.toLowerCase().includes(normalisedSearch);
+        centre.officeLocation.toLowerCase().includes(normalisedSearch) ||
+        centre.landmark.toLowerCase().includes(normalisedSearch) ||
+        centre.constituency.toLowerCase().includes(normalisedSearch);
 
-      const matchesArea =
-        selectedArea === "all" || centre.place === selectedArea;
+      const matchesCounty =
+        selectedCounty === "all" || centre.county === selectedCounty;
 
-      return matchesSearch && matchesArea;
+      return matchesSearch && matchesCounty;
     });
-  }, [centres, searchTerm, selectedArea]);
+  }, [centres, searchTerm, selectedCounty]);
 
   const openWhatsApp = (message) => {
     window.open(
@@ -62,7 +64,7 @@ export default function Centres() {
 
   const handleShareCentre = (centre) => {
     openWhatsApp(
-      `Found a registration centre: ${centre.name} in ${centre.place}. Open it here: ${buildAbsoluteUrl(
+      `Found an open voter registration centre: ${centre.name} at ${centre.officeLocation}, ${centre.county}. Open it here: ${buildAbsoluteUrl(
         `/centres?centre=${centre.id}`,
       )}`,
     );
@@ -75,64 +77,69 @@ export default function Centres() {
       <main className="mx-auto max-w-7xl px-6 py-8 lg:px-8 lg:py-12">
         <div className="mb-10">
           <h2 className="mb-2 text-4xl font-black uppercase text-red-600">
-            Find a Registration Centre
+            Open Registration Centres
           </h2>
-          <p className="text-white/70">
-            Search by town, narrow the list, or use your current location to
-            see the closest centres first.
+          <p className="max-w-3xl text-white/70">
+            This list is limited to offices the IEBC has publicly listed for
+            the current ECVR exercise. Use search, filter by county, then turn
+            on location to sort the nearest offices first.
           </p>
         </div>
 
         <div className="mb-8 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="rounded-[2rem] border border-white/10 bg-white/[0.03] p-6">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
             <label
               htmlFor="centre-search"
               className="block text-sm font-semibold text-white/70"
             >
-              Search by town, estate, county, or centre name
+              Search by constituency, county, landmark, or office location
             </label>
             <input
               id="centre-search"
               type="search"
-              placeholder="Thika, Juja, Ruiru..."
+              placeholder="Thika Town, Kisumu, Huduma Centre..."
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              className="mt-3 w-full rounded-full border border-white/20 bg-white/10 px-6 py-4 text-white placeholder:text-white/50 focus:outline-none focus:border-red-500/50 focus:bg-white/15"
+              className="mt-3 w-full rounded-full border border-white/20 bg-white/10 px-6 py-4 text-white placeholder:text-white/50 focus:border-red-500/50 focus:bg-white/15 focus:outline-none"
             />
 
             <div className="mt-4">
               <label
-                htmlFor="centre-area"
+                htmlFor="centre-county"
                 className="block text-sm font-semibold text-white/70"
               >
-                Filter by area
+                Filter by county
               </label>
               <select
-                id="centre-area"
-                value={selectedArea}
-                onChange={(event) => setSelectedArea(event.target.value)}
-                className="mt-3 w-full rounded-full border border-white/20 bg-black px-6 py-4 text-white focus:outline-none focus:border-red-500/50"
+                id="centre-county"
+                value={selectedCounty}
+                onChange={(event) => setSelectedCounty(event.target.value)}
+                className="mt-3 w-full rounded-full border border-white/20 bg-black px-6 py-4 text-white focus:border-red-500/50 focus:outline-none"
               >
-                <option value="all">All areas</option>
-                {areas.map((area) => (
-                  <option key={area} value={area}>
-                    {area}
+                <option value="all">All counties</option>
+                {counties.map((county) => (
+                  <option key={county} value={county}>
+                    {county}
                   </option>
                 ))}
               </select>
             </div>
+
+            <div className="mt-5 rounded-xl border border-white/10 bg-black/25 px-4 py-4 text-sm text-white/65">
+              {filteredCentres.length} open centres available right now.
+            </div>
           </div>
 
-          <div className="rounded-[2rem] border border-red-500/30 bg-red-600 p-6">
+          <div className="rounded-2xl border border-red-500/30 bg-red-600 p-6">
             <p className="text-sm uppercase tracking-[0.28em] text-white/70">
               Live location
             </p>
             <h3 className="mt-3 text-2xl font-black uppercase">
-              Sort by what is nearest to you
+              See how far each office is from you
             </h3>
             <p className="mt-3 text-white/85">
-              Use your phone location to calculate real distances for the
-              centres below.
+              Turn on location and the list will re-order itself by your real
+              distance from each centre.
             </p>
 
             <button
@@ -145,14 +152,20 @@ export default function Centres() {
 
             <p className="mt-4 text-sm text-white/80">
               {locationStatus === "ready"
-                ? "Distances are now based on your current position."
-                : "You can still search manually without sharing location."}
+                ? "Distances below are now based on your current position."
+                : "Until you share location, each card still shows the official office marker."}
             </p>
 
             {locationError ? (
               <p className="mt-3 text-sm text-white">{locationError}</p>
             ) : null}
           </div>
+        </div>
+
+        <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 text-sm text-white/65">
+          IEBC said ECVR was not ongoing as of April 10, 2026 in{" "}
+          {CLOSED_REGISTRATION_AREAS.join(", ")}, plus Porro Ward and Endo Ward.
+          Those areas are not shown here.
         </div>
 
         <div className="grid gap-4 md:gap-6">
@@ -170,24 +183,38 @@ export default function Centres() {
                   }`}
                 >
                   <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <div>
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div className="max-w-3xl">
                         <h4 className="text-xl font-bold">{centre.name}</h4>
                         <p className="mt-1 text-sm text-white/55">
                           {centre.place}, {centre.county}
                         </p>
+                        <p className="mt-3 text-sm text-white/80">
+                          {centre.officeLocation}
+                        </p>
                         <p className="mt-2 text-sm text-white/45">
-                          {centre.landmark}
+                          Landmark: {centre.landmark}
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.18em]">
-                        <span className="rounded-full border border-white/10 px-3 py-2 text-white/60">
+                      <div className="flex flex-col gap-2 text-xs uppercase tracking-[0.18em] md:items-end">
+                        <span className="rounded-full border border-white/10 px-3 py-2 text-white/70">
                           {centre.status}
                         </span>
-                        <span className="rounded-full border border-red-500/30 bg-red-500/10 px-3 py-2 text-red-400">
+                        <span className="rounded-full border border-red-500/30 bg-red-500/10 px-3 py-2 text-red-300">
                           {formatDistanceKm(centre.distanceKm)}
                         </span>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 text-sm text-white/65 md:grid-cols-2">
+                      <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3">
+                        Official office marker: {centre.officialDistance}
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3">
+                        {userCoords
+                          ? `From you: ${formatDistanceKm(centre.distanceKm)}`
+                          : "Turn on location to calculate your distance"}
                       </div>
                     </div>
 
@@ -222,8 +249,8 @@ export default function Centres() {
           ) : (
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] py-12 text-center">
               <p className="text-white/60">
-                No centres match that search yet. Try a nearby town or clear
-                the area filter.
+                No open centres match that search yet. Try another constituency,
+                landmark, or county.
               </p>
             </div>
           )}

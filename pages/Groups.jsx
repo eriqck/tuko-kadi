@@ -5,6 +5,7 @@ import { useAppData } from "../context/AppDataContext";
 import {
   buildAbsoluteUrl,
   buildWhatsAppUrl,
+  combineDateAndTime,
   formatDepartureTime,
   formatGroupMembers,
 } from "../lib/app-utils";
@@ -12,25 +13,34 @@ import {
 const EMPTY_FORM = {
   name: "",
   meetingPoint: "",
+  departureDate: "",
   departureTime: "",
-  area: "",
   centerId: "",
 };
 
 export default function Groups() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { areas, centres, createGroup, groups, joinGroup, leaveGroup } =
-    useAppData();
+  const { centres, createGroup, groups, joinGroup, leaveGroup } = useAppData();
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [latestGroupId, setLatestGroupId] = useState("");
 
   const highlightedGroupId = searchParams.get("group") || "";
   const prefilledCentreId = searchParams.get("centre") || "";
+  const now = new Date();
+  const today = new Date(
+    now.getTime() - now.getTimezoneOffset() * 60000,
+  ).toISOString().slice(0, 10);
 
   const selectedCentre = useMemo(
     () => centres.find((centre) => centre.id === formData.centerId) || null,
     [centres, formData.centerId],
+  );
+
+  const latestGroup = useMemo(
+    () => groups.find((group) => group.id === latestGroupId) || null,
+    [groups, latestGroupId],
   );
 
   useEffect(() => {
@@ -47,7 +57,6 @@ export default function Groups() {
     setFormData((currentFormData) => ({
       ...currentFormData,
       centerId: centre.id,
-      area: currentFormData.area || centre.place,
     }));
   }, [centres, prefilledCentreId]);
 
@@ -68,19 +77,16 @@ export default function Groups() {
     );
   };
 
+  const shareGroupOnWhatsApp = (group) => {
+    openWhatsApp(
+      `Join ${group.name}. Meet at ${group.meetingPoint}. ${formatDepartureTime(
+        group.departureTime,
+      )}. Group link: ${buildAbsoluteUrl(`/groups?group=${group.id}`)}`,
+    );
+  };
+
   const handleInputChange = (event) => {
     const { name, value } = event.target;
-
-    if (name === "centerId") {
-      const centre = centres.find((entry) => entry.id === value);
-
-      setFormData((currentFormData) => ({
-        ...currentFormData,
-        centerId: value,
-        area: centre ? centre.place : currentFormData.area,
-      }));
-      return;
-    }
 
     setFormData((currentFormData) => ({
       ...currentFormData,
@@ -93,9 +99,13 @@ export default function Groups() {
 
     const cleanName = formData.name.trim();
     const cleanMeetingPoint = formData.meetingPoint.trim();
+    const departureTime = combineDateAndTime(
+      formData.departureDate,
+      formData.departureTime,
+    );
 
-    if (!cleanName || !cleanMeetingPoint || !formData.departureTime) {
-      setFeedbackMessage("Add a name, meeting point, and departure time.");
+    if (!cleanName || !cleanMeetingPoint || !departureTime) {
+      setFeedbackMessage("Add a group name, meeting point, date, and time.");
       return;
     }
 
@@ -106,18 +116,18 @@ export default function Groups() {
 
     const newGroup = createGroup({
       name: cleanName,
-      area: formData.area,
+      area: selectedCentre?.place || "",
       meetingPoint: cleanMeetingPoint,
-      departureTime: formData.departureTime,
+      departureTime,
       centerId: formData.centerId,
     });
 
     setFormData({
       ...EMPTY_FORM,
-      area: formData.area,
       centerId: formData.centerId,
     });
-    setFeedbackMessage(`${newGroup.name} is live. Share it now.`);
+    setLatestGroupId(newGroup.id);
+    setFeedbackMessage(`${newGroup.name} is live. Share the invite now.`);
     navigate(`/groups?group=${newGroup.id}`, { replace: true });
   };
 
@@ -137,14 +147,6 @@ export default function Groups() {
     );
   };
 
-  const shareGroupOnWhatsApp = (group) => {
-    openWhatsApp(
-      `Join ${group.name}. Meet at ${group.meetingPoint}. ${formatDepartureTime(
-        group.departureTime,
-      )}. Group link: ${buildAbsoluteUrl(`/groups?group=${group.id}`)}`,
-    );
-  };
-
   return (
     <div className="min-h-screen bg-black text-white">
       <SiteHeader primaryAction={{ label: "Find Centre", to: "/centres" }} />
@@ -154,9 +156,9 @@ export default function Groups() {
           <h2 className="mb-2 text-4xl font-black uppercase text-red-600">
             Join or Create a Mbogi
           </h2>
-          <p className="text-white/70">
-            Pick an active group, or create your own trip and send the invite
-            link to everyone you want on the same plan.
+          <p className="max-w-3xl text-white/70">
+            Pick an active group, or create one trip and share a direct invite
+            link so everyone heads to the same centre together.
           </p>
         </div>
 
@@ -252,9 +254,29 @@ export default function Groups() {
                     value={formData.name}
                     onChange={handleInputChange}
                     placeholder="Thika Sunday Mbogi"
-                    className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-red-500/50"
+                    className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder-white/30 focus:border-red-500/50 focus:outline-none"
                     required
                   />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-white/70">
+                    Pick a Centre
+                  </label>
+                  <select
+                    name="centerId"
+                    value={formData.centerId}
+                    onChange={handleInputChange}
+                    className="w-full rounded-lg border border-white/10 bg-black px-4 py-3 text-sm text-white focus:border-red-500/50 focus:outline-none"
+                    required
+                  >
+                    <option value="">Choose centre</option>
+                    {centres.map((centre) => (
+                      <option key={centre.id} value={centre.id}>
+                        {centre.place}, {centre.county} - {centre.officeLocation}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -266,69 +288,50 @@ export default function Groups() {
                     name="meetingPoint"
                     value={formData.meetingPoint}
                     onChange={handleInputChange}
-                    placeholder="Thika stage"
-                    className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none focus:border-red-500/50"
+                    placeholder="Blue Post roundabout"
+                    className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder-white/30 focus:border-red-500/50 focus:outline-none"
                     required
                   />
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-white/70">
-                    Departure Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    name="departureTime"
-                    value={formData.departureTime}
-                    onChange={handleInputChange}
-                    className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500/50"
-                    required
-                  />
-                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      name="departureDate"
+                      value={formData.departureDate}
+                      min={today}
+                      onChange={handleInputChange}
+                      className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white focus:border-red-500/50 focus:outline-none"
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-white/70">
-                    Area
-                  </label>
-                  <select
-                    name="area"
-                    value={formData.area}
-                    onChange={handleInputChange}
-                    className="w-full rounded-lg border border-white/10 bg-black px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500/50"
-                  >
-                    <option value="">Choose area</option>
-                    {areas.map((area) => (
-                      <option key={area} value={area}>
-                        {area}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-white/70">
-                    Destination Centre
-                  </label>
-                  <select
-                    name="centerId"
-                    value={formData.centerId}
-                    onChange={handleInputChange}
-                    className="w-full rounded-lg border border-white/10 bg-black px-4 py-3 text-sm text-white focus:outline-none focus:border-red-500/50"
-                    required
-                  >
-                    <option value="">Choose centre</option>
-                    {centres.map((centre) => (
-                      <option key={centre.id} value={centre.id}>
-                        {centre.name} - {centre.place}
-                      </option>
-                    ))}
-                  </select>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-white/70">
+                      Time
+                    </label>
+                    <input
+                      type="time"
+                      name="departureTime"
+                      value={formData.departureTime}
+                      onChange={handleInputChange}
+                      className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white focus:border-red-500/50 focus:outline-none"
+                      required
+                    />
+                  </div>
                 </div>
 
                 {selectedCentre ? (
                   <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4 text-sm text-white/80">
-                    {selectedCentre.name} in {selectedCentre.place}.{" "}
-                    {selectedCentre.status}.
+                    <p className="font-semibold text-white">{selectedCentre.name}</p>
+                    <p className="mt-1">{selectedCentre.officeLocation}</p>
+                    <p className="mt-1 text-white/60">
+                      Landmark: {selectedCentre.landmark}
+                    </p>
                   </div>
                 ) : null}
 
@@ -340,8 +343,19 @@ export default function Groups() {
                 </button>
               </form>
 
+              {latestGroup ? (
+                <button
+                  type="button"
+                  onClick={() => shareGroupOnWhatsApp(latestGroup)}
+                  className="mt-4 w-full rounded-lg border border-green-500/30 bg-green-500/10 px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-white transition hover:bg-green-500/20"
+                >
+                  Share invite on WhatsApp
+                </button>
+              ) : null}
+
               <p className="mt-6 text-center text-xs text-white/50">
-                Your new group is saved here and ready to share immediately.
+                Your group is saved in this browser and ready to share
+                immediately.
               </p>
             </div>
           </div>

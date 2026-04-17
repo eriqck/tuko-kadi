@@ -13,8 +13,8 @@ import {
 } from "../lib/app-utils";
 
 const STORAGE_KEYS = {
-  groups: "tuko-kadi.groups.v1",
-  joinedGroupIds: "tuko-kadi.joined-group-ids.v1",
+  groups: "tuko-kadi.groups.v2",
+  joinedGroupIds: "tuko-kadi.joined-group-ids.v2",
 };
 
 const AppDataContext = createContext(null);
@@ -185,9 +185,7 @@ export function AppDataProvider({ children }) {
     const countiesActive = new Set(
       DEFAULT_CENTRES.map((centre) => centre.county),
     ).size;
-    const centresOpen = DEFAULT_CENTRES.filter((centre) =>
-      centre.status.toLowerCase().includes("open"),
-    ).length;
+    const centresOpen = DEFAULT_CENTRES.length;
 
     return [
       {
@@ -318,8 +316,15 @@ export function AppDataProvider({ children }) {
     [],
   );
 
+  const counties = useMemo(
+    () =>
+      [...new Set(DEFAULT_CENTRES.map((centre) => centre.county))].sort(),
+    [],
+  );
+
   const value = {
     areas,
+    counties,
     centres,
     createGroup,
     groups: groupsWithMeta,

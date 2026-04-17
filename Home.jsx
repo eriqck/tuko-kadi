@@ -7,6 +7,7 @@ import { REGISTRATION_CHECKLIST } from "./lib/content";
 import {
   buildAbsoluteUrl,
   buildWhatsAppUrl,
+  combineDateAndTime,
   formatDepartureTime,
   formatDistanceKm,
   formatGroupMembers,
@@ -70,6 +71,7 @@ export default function TukoKadiLanding() {
   const navigate = useNavigate();
   const {
     centres,
+    createGroup,
     groups,
     joinGroup,
     leaveGroup,
@@ -81,9 +83,35 @@ export default function TukoKadiLanding() {
   } = useAppData();
   const [centreQuery, setCentreQuery] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [quickGroupForm, setQuickGroupForm] = useState({
+    name: "",
+    centerId: "",
+    meetingPoint: "",
+    departureDate: "",
+    departureTime: "",
+  });
+  const [quickGroupId, setQuickGroupId] = useState("");
+  const now = new Date();
+  const today = new Date(
+    now.getTime() - now.getTimezoneOffset() * 60000,
+  ).toISOString().slice(0, 10);
+  const featuredCentreIds = [
+    "kiambu-thika-town",
+    "kiambu-juja",
+    "kiambu-ruiru",
+  ];
 
-  const previewCentres = centres.slice(0, 3);
+  const previewCentres = userCoords
+    ? centres.slice(0, 3)
+    : featuredCentreIds
+        .map((centreId) =>
+          centres.find((centre) => centre.id === centreId) || null,
+        )
+        .filter(Boolean);
   const previewGroups = groups.slice(0, 3);
+  const quickSelectedCentre =
+    centres.find((centre) => centre.id === quickGroupForm.centerId) || null;
+  const quickGroup = groups.find((group) => group.id === quickGroupId) || null;
 
   useEffect(() => {
     if (!location.hash) {
@@ -170,6 +198,54 @@ export default function TukoKadiLanding() {
         ? `You left ${group.name}.`
         : `You joined ${group.name}.`,
     );
+  };
+
+  const handleQuickGroupChange = (event) => {
+    const { name, value } = event.target;
+
+    setQuickGroupForm((currentForm) => ({
+      ...currentForm,
+      [name]: value,
+    }));
+  };
+
+  const handleCreateQuickGroup = (event) => {
+    event.preventDefault();
+
+    const cleanName = quickGroupForm.name.trim();
+    const cleanMeetingPoint = quickGroupForm.meetingPoint.trim();
+    const departureTime = combineDateAndTime(
+      quickGroupForm.departureDate,
+      quickGroupForm.departureTime,
+    );
+
+    if (
+      !cleanName ||
+      !cleanMeetingPoint ||
+      !quickGroupForm.centerId ||
+      !departureTime
+    ) {
+      setFeedbackMessage("Pick a centre, meeting point, date, and time.");
+      return;
+    }
+
+    const newGroup = createGroup({
+      name: cleanName,
+      area: quickSelectedCentre?.place || "",
+      meetingPoint: cleanMeetingPoint,
+      departureTime,
+      centerId: quickGroupForm.centerId,
+    });
+
+    setQuickGroupId(newGroup.id);
+    setQuickGroupForm({
+      name: "",
+      centerId: quickGroupForm.centerId,
+      meetingPoint: "",
+      departureDate: "",
+      departureTime: "",
+    });
+    setFeedbackMessage(`${newGroup.name} is live. Share the invite now.`);
   };
 
   const featureCards = [
@@ -325,7 +401,8 @@ export default function TukoKadiLanding() {
                 Find a place you can actually go today
               </h3>
               <p className="mt-4 text-white/85">
-                Search by town, or let your phone sort centres by distance.
+                Search the officially listed open offices, or let your phone
+                sort them by distance.
               </p>
 
               <form onSubmit={handleFindCentres} className="mt-8">
@@ -333,14 +410,14 @@ export default function TukoKadiLanding() {
                   htmlFor="home-centre-search"
                   className="text-sm text-white/70"
                 >
-                  Search by town, estate, campus, or county
+                  Search by constituency, estate, campus, or county
                 </label>
                 <input
                   id="home-centre-search"
                   type="search"
                   value={centreQuery}
                   onChange={(event) => setCentreQuery(event.target.value)}
-                  placeholder="Thika, Juja, Ruiru..."
+                  placeholder="Thika Town, Juja, Kisumu Central..."
                   className="mt-3 w-full rounded-full bg-white/10 px-4 py-3 text-sm font-medium text-white placeholder:text-white/55 focus:outline-none focus:ring-2 focus:ring-white/30"
                 />
 
@@ -386,8 +463,11 @@ export default function TukoKadiLanding() {
                       <p className="mt-1 text-sm text-white/55">
                         {centre.place}, {centre.county}
                       </p>
+                      <p className="mt-2 text-sm text-white/75">
+                        {centre.officeLocation}
+                      </p>
                       <p className="mt-2 text-xs text-white/45">
-                        {centre.landmark}
+                        Landmark: {centre.landmark}
                       </p>
                     </div>
 
@@ -399,6 +479,10 @@ export default function TukoKadiLanding() {
                         {formatDistanceKm(centre.distanceKm)}
                       </span>
                     </div>
+                  </div>
+
+                  <div className="mt-4 rounded-full border border-white/10 px-4 py-2 text-xs text-white/55">
+                    Official office marker: {centre.officialDistance}
                   </div>
 
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -515,25 +599,91 @@ export default function TukoKadiLanding() {
                 friend circle and take everyone to the same centre together.
               </p>
 
-              <div className="mt-8 space-y-3">
-                <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/70">
-                  Pick a centre
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/70">
-                  Add your meeting point
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white/70">
-                  Share the invite link on WhatsApp
-                </div>
-              </div>
+              <form onSubmit={handleCreateQuickGroup} className="mt-8 space-y-4">
+                <input
+                  type="text"
+                  name="name"
+                  value={quickGroupForm.name}
+                  onChange={handleQuickGroupChange}
+                  placeholder="Estate, church, campus, or friend circle"
+                  className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder-white/35 focus:border-red-500/50 focus:outline-none"
+                  required
+                />
 
-              <button
-                type="button"
-                onClick={() => navigate("/groups")}
-                className="mt-6 w-full rounded-full bg-white px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-black transition hover:bg-white/90"
-              >
-                Create your group
-              </button>
+                <select
+                  name="centerId"
+                  value={quickGroupForm.centerId}
+                  onChange={handleQuickGroupChange}
+                  className="w-full rounded-lg border border-white/10 bg-black px-4 py-3 text-sm text-white focus:border-red-500/50 focus:outline-none"
+                  required
+                >
+                  <option value="">Pick a centre</option>
+                  {centres.map((centre) => (
+                    <option key={centre.id} value={centre.id}>
+                      {centre.place}, {centre.county} - {centre.officeLocation}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="text"
+                  name="meetingPoint"
+                  value={quickGroupForm.meetingPoint}
+                  onChange={handleQuickGroupChange}
+                  placeholder="Add your meeting point"
+                  className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white placeholder-white/35 focus:border-red-500/50 focus:outline-none"
+                  required
+                />
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input
+                    type="date"
+                    name="departureDate"
+                    value={quickGroupForm.departureDate}
+                    min={today}
+                    onChange={handleQuickGroupChange}
+                    className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white focus:border-red-500/50 focus:outline-none"
+                    required
+                  />
+                  <input
+                    type="time"
+                    name="departureTime"
+                    value={quickGroupForm.departureTime}
+                    onChange={handleQuickGroupChange}
+                    className="w-full rounded-lg border border-white/10 bg-black/25 px-4 py-3 text-sm text-white focus:border-red-500/50 focus:outline-none"
+                    required
+                  />
+                </div>
+
+                {quickSelectedCentre ? (
+                  <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-4 text-sm text-white/75">
+                    <p className="font-semibold text-white">
+                      {quickSelectedCentre.name}
+                    </p>
+                    <p className="mt-1">{quickSelectedCentre.officeLocation}</p>
+                    <p className="mt-1 text-white/55">
+                      Landmark: {quickSelectedCentre.landmark}
+                    </p>
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  className="w-full rounded-full bg-white px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-black transition hover:bg-white/90"
+                >
+                  Create your group
+                </button>
+              </form>
+
+              {quickGroup ? (
+                <button
+                  type="button"
+                  onClick={() => handleShareGroup(quickGroup)}
+                  className="mt-4 w-full rounded-full bg-green-600 px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-white transition hover:bg-green-500"
+                >
+                  Share invite link on WhatsApp
+                </button>
+              ) : null}
             </div>
           </div>
         </section>
